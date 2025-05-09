@@ -1,10 +1,12 @@
 export type RootStackParamList = {
-  Home: undefined;
-  News: undefined;
+  Login: undefined;
+  Profile: undefined;
   Forum: undefined;
+  News: undefined;
   PostDetail: { postId: number };
   CreatePost: undefined;
-  Profile: undefined;
-  Login: undefined;
-  NewsDetail: { id: number };
+  Home: undefined;
+  MainDrawer: undefined; 
+  CardProduct: undefined;
+  CardDetail: undefined;
 };
