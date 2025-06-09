@@ -4,7 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DrawerNavigator from './DrawerNavigator';
 import PostDetailScreen from '../screens/PostDetailScreen';
 import NewsDetailScreen from '../screens/NewsDetailScreen/NewsDetailScreen';
-import LoginScreen from '../screens/LoginScreen';  
+import LoginScreen from '../screens/LoginScreen';
+import SignUpScreen from '../screens/SignUpScreen';
 import CardDetailScreen from '../screens/CardDetailScreen';
 import CardProductScreen from '../screens/CardProductScreen';
 
@@ -17,6 +18,7 @@ const MainStackNavigator = () => (
   >
     
     <Stack.Screen name="Login" component={LoginScreen} />
+    <Stack.Screen name="SignUp" component={SignUpScreen} />
 
     
     <Stack.Screen name="MainDrawer" component={DrawerNavigator} />
