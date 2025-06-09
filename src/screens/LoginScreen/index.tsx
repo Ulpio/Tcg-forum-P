@@ -15,6 +15,7 @@ import {
   Modal,
 } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types/navigation';
 import * as Yup from 'yup';
@@ -60,6 +61,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
+      await AsyncStorage.setItem('is_logged_in', 'true');
       // reset navigation to MainDrawer at root
       const parent = navigation.getParent() ?? navigation;
       parent.dispatch(
