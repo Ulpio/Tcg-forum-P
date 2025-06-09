@@ -1,66 +1,130 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Share, Linking, Alert, } from 'react-native';
-import FilterBar from '../../components/FilterBar';
-import { forumPosts } from '../../utils/MockData';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import FilterBar, { FilterType } from '../../components/FilterBar';
 import { useNavigation } from '@react-navigation/native';
-import { RootStackParamList } from '../../types/navigation';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { NewsItem, ForumPost } from '../../types';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../types/navigation';
+import type { ForumPost } from '../../types';
+import { db, auth } from '../../firebase/config';
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
+import type { User } from 'firebase/auth';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Forum'>;
 
-const ForumScreen = () => {
-  const [filter, setFilter] = useState<string>('Todos');
+export default function ForumScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const [filter, setFilter] = useState<FilterType>('Todos');
+  const [posts, setPosts] = useState<ForumPost[]>([]);
 
-  const filteredPosts =
-    filter === 'Todos'
-      ? forumPosts
-      : forumPosts.filter(item => item.category === filter);
+  
+  const [replyForId, setReplyForId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState<string>('');
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const handleSharePost = async (post: ForumPost) => {
-    try {
-      await Share.share({
-        title: post.title,
-        message: `${post.title}\n\n${post.content}`,
-      });
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível abrir o compartilhamento.');
-    }
-  };
-
-  const sharePostViaWhatsApp = (post: ForumPost) => {
-    const message = encodeURIComponent(`${post.title}\n\n${post.content}`);
-    const whatsappURL = `whatsapp://send?text=${message}`;
-
-    Linking.openURL(whatsappURL).catch(() => {
-      Alert.alert('Erro', 'WhatsApp não está instalado neste dispositivo.');
+  useEffect(() => {
+    const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snapshot => {
+      setPosts(
+        snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...(doc.data() as Omit<ForumPost, 'id'>),
+        }))
+      );
     });
+    return () => unsub();
+  }, []);
+
+  const filtered =
+    filter === 'Todos'
+      ? posts
+      : posts.filter(item => item.category === filter);
+
+  const handleReplySubmit = async () => {
+    if (!replyForId) return;
+    const user: User | null = auth.currentUser;
+    if (!user) {
+      alert('Faça login para responder.');
+      return;
+    }
+    if (!replyText.trim()) return;
+
+    setSubmitting(true);
+    try {
+      await addDoc(
+        collection(db, 'posts', replyForId, 'replies'),
+        {
+          text: replyText,
+          authorId: user.uid,
+          createdAt: serverTimestamp(),
+        }
+      );
+      setReplyText('');
+      setReplyForId(null);
+    } catch (e) {
+      console.error('Erro enviando resposta:', e);
+      alert('Erro ao enviar resposta.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderItem = ({ item }: { item: ForumPost }) => (
     <View style={styles.card}>
       <TouchableOpacity
+        style={styles.postArea}
         onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
       >
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.category}>{item.category}</Text>
+        <Text style={styles.content}>{item.content}</Text>
       </TouchableOpacity>
 
-      <View style={styles.shareRow}>
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={() => handleSharePost(item)}
+      {replyForId === item.id ? (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <Text style={styles.shareText}>Compartilhar</Text>
-        </TouchableOpacity>
+          <View style={styles.replyContainer}>
+            <TextInput
+              style={styles.replyInput}
+              placeholder="Sua resposta..."
+              placeholderTextColor="#888"
+              value={replyText}
+              onChangeText={setReplyText}
+              editable={!submitting}
+            />
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleReplySubmit}
+              disabled={submitting}
+            >
+              <Text style={styles.submitText}>Enviar</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      ) : (
         <TouchableOpacity
-          style={[styles.shareButton, styles.whatsappButton]}
-          onPress={() => sharePostViaWhatsApp(item)}
+          style={styles.replyButton}
+          onPress={() => setReplyForId(item.id)}
         >
-          <Text style={styles.shareText}>WhatsApp</Text>
+          <Text style={styles.replyButtonText}>Responder</Text>
         </TouchableOpacity>
-      </View>
+      )}
     </View>
   );
 
@@ -68,14 +132,14 @@ const ForumScreen = () => {
     <View style={styles.container}>
       <FilterBar filter={filter} setFilter={setFilter} />
       <FlatList
-        data={filteredPosts}
-        keyExtractor={item => item.id.toString()}
+        data={filtered}
+        keyExtractor={item => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 100 }}
       />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -90,6 +154,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginVertical: 8,
   },
+  postArea: {
+    flex: 1,
+  },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -100,30 +167,39 @@ const styles = StyleSheet.create({
     color: '#999',
     marginVertical: 4,
   },
-  author: {
-    fontSize: 14,
+  content: {
+    fontSize: 15,
     color: '#ccc',
-    marginBottom: 12,
   },
-  shareRow: {
+  replyButton: {
+    marginTop: 12,
+    alignSelf: 'flex-end',
+  },
+  replyButtonText: {
+    color: '#556b2f',
+    fontWeight: 'bold',
+  },
+  replyContainer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
+    alignItems: 'center',
+    marginTop: 12,
   },
-  shareButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#444',
+  replyInput: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    color: '#fff',
+    padding: 10,
     borderRadius: 8,
+  },
+  submitButton: {
     marginLeft: 8,
+    backgroundColor: '#556b2f',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  whatsappButton: {
-    backgroundColor: '#25D366',
-  },
-  shareText: {
+  submitText: {
     color: '#fff',
     fontWeight: 'bold',
   },
 });
-
-export default ForumScreen;

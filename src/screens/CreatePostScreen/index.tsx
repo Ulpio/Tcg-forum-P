@@ -1,28 +1,93 @@
+// src/screens/CreatePostScreen/index.tsx
 import React from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+} from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
+import { db, auth } from '../../firebase/config';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../types/navigation';
+
+type NavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'CreatePost'
+>;
 
 const validationSchema = Yup.object().shape({
-  title: Yup.string().required('Título obrigatório'),
-  content: Yup.string().required('Conteúdo obrigatório'),
-  category: Yup.string().oneOf(['Magic', 'Yu-Gi-Oh!', 'Pokémon']).required('Categoria obrigatória'),
+  title:    Yup.string().required('Título obrigatório'),
+  content:  Yup.string().required('Conteúdo obrigatório'),
+  category: Yup.string()
+    .oneOf(['Magic', 'Yu-Gi-Oh!', 'Pokémon'])
+    .required('Categoria obrigatória'),
 });
 
-const CreatePostScreen = () => {
-  const handleSubmit = (values: any) => {
-    Alert.alert('Post criado!', `Título: ${values.title}\nCategoria: ${values.category}`);
+export default function CreatePostScreen() {
+  const navigation = useNavigation<NavigationProp>();
+
+  const handleSubmit = async (values: {
+    title: string;
+    content: string;
+    category: string;
+  }) => {
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert(
+        'Não autenticado',
+        'Você precisa fazer login para criar um post.',
+        [{ text: 'Ir para Login', onPress: () => navigation.replace('Login') }]
+      );
+      console.log("entrou")
+      return;
+    }
+    console.log("entrou")
+    try {
+      console.log("entrou")
+      await addDoc(collection(db, 'posts'), {
+        title:     values.title,
+        content:   values.content,
+        category:  values.category,
+        authorId:  user.uid,
+        createdAt: serverTimestamp(),
+      });
+
+      // 3) Confirma e redireciona
+      Alert.alert('Sucesso', 'Tópico criado com sucesso!', [
+        {
+          text: 'OK',
+          onPress: () => navigation.replace('Forum'),
+        },
+      ]);
+    } catch (err: any) {
+      console.error('Erro criando post:', err);
+      Alert.alert('Erro', err.message || 'Não foi possível criar o post.');
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Criar novo post</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Novo tópico</Text>
       <Formik
         initialValues={{ title: '', content: '', category: '' }}
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
       >
-        {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
+        {({
+          handleChange,
+          handleBlur,
+          handleSubmit,
+          values,
+          errors,
+          touched,
+        }) => (
           <>
             <TextInput
               style={styles.input}
@@ -32,7 +97,9 @@ const CreatePostScreen = () => {
               onBlur={handleBlur('title')}
               value={values.title}
             />
-            {touched.title && errors.title && <Text style={styles.error}>{errors.title}</Text>}
+            {touched.title && errors.title && (
+              <Text style={styles.error}>{errors.title}</Text>
+            )}
 
             <TextInput
               style={[styles.input, styles.multiline]}
@@ -44,7 +111,9 @@ const CreatePostScreen = () => {
               onBlur={handleBlur('content')}
               value={values.content}
             />
-            {touched.content && errors.content && <Text style={styles.error}>{errors.content}</Text>}
+            {touched.content && errors.content && (
+              <Text style={styles.error}>{errors.content}</Text>
+            )}
 
             <TextInput
               style={styles.input}
@@ -54,21 +123,26 @@ const CreatePostScreen = () => {
               onBlur={handleBlur('category')}
               value={values.category}
             />
-            {touched.category && errors.category && <Text style={styles.error}>{errors.category}</Text>}
+            {touched.category && errors.category && (
+              <Text style={styles.error}>{errors.category}</Text>
+            )}
 
-            <TouchableOpacity style={styles.button} onPress={() => handleSubmit()}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => handleSubmit()}
+            >
               <Text style={styles.buttonText}>Publicar</Text>
             </TouchableOpacity>
           </>
         )}
       </Formik>
-    </View>
+    </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     padding: 20,
     backgroundColor: '#1e1e1e',
   },
@@ -105,5 +179,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
-export default CreatePostScreen;

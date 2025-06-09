@@ -1,12 +1,12 @@
 export type NewsItem = {
-  id: number;
+  id: string;
   title: string;
   content: string;
   category: 'Magic' | 'Yu-Gi-Oh!' | 'Pokémon';
 };
 
 export type ForumPost = {
-  id: number;
+  id: any;
   title: string;
   content: string;
   category: 'Magic' | 'Yu-Gi-Oh!' | 'Pokémon';
