@@ -87,14 +87,6 @@ export default function PostDetailScreen() {
     if (!replyText.trim()) return;
 
     setSubmitting(true);
-    await addDoc(
-      collection(db, 'posts', postId, 'replies'),  
-      {
-        text:      replyText,            
-        authorId:  auth.currentUser!.uid,  
-        createdAt: serverTimestamp(),  
-      }
-);
     try {
       await addDoc(collection(db, 'posts', postId, 'replies'), {
         text: replyText,
